@@ -1,0 +1,58 @@
+{
+  "manifest_version": 3,
+  "name": "Keyshots",
+  "version": "0.1.0",
+  "description": "Keyboard-driven action overlay for Gmail, Slack, Notion",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "identity"
+  ],
+  "host_permissions": [
+    "https://hooks.slack.com/*",
+    "https://api.notion.com/*",
+    "https://www.googleapis.com/*"
+  ],
+  "oauth2": {
+    "client_id": "495152588629-98g5suvfjc1bkmcktljqnptiosoh7jg0.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/gmail.send"
+    ]
+  },
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": [
+        "utils/storage.js",
+        "utils/api-client.js",
+        "utils/gmail-api.js",
+        "components/command-palette.js",
+        "components/gmail-form.js",
+        "components/slack-form.js",
+        "components/notion-form.js",
+        "components/settings.js",
+        "overlay/overlay.js",
+        "content/content-script.js"
+      ],
+      "css": ["overlay/overlay.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "commands": {
+    "toggle-overlay": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+K",
+        "mac": "Alt+Space"
+      },
+      "description": "Toggle Keyshots overlay"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
