@@ -89,19 +89,12 @@ const KeyshotsSlackForm = {
       return;
     }
     
-    const webhookUrl = await KeyshotsStorage.get(KeyshotsStorage.KEYS.SLACK_WEBHOOK);
-    
-    if (!webhookUrl) {
-      this.showError('Slack webhook not configured');
-      return;
-    }
-    
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.innerHTML = 'Sending...';
     }
     
-    const result = await KeyshotsAPI.sendSlackMessage(webhookUrl, message);
+    const result = await KeyshotsAPI.sendSlackMessage(message);
     
     if (result.success) {
       KeyshotsOverlay.showMessage('success', 'Message sent to Slack!');

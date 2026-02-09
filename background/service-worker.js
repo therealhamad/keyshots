@@ -23,6 +23,7 @@ chrome.commands.onCommand.addListener((command) => {
 
 // Handle messages from content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // Gmail actions
   if (request.action === 'gmailSendEmail') {
     handleSendEmail(request.to, request.subject, request.body).then(sendResponse);
     return true;
@@ -35,6 +36,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   
   if (request.action === 'gmailSignOut') {
     handleSignOut().then(sendResponse);
+    return true;
+  }
+
+  // Slack actions
+  if (request.action === 'slackSendMessage') {
+    handleSlackMessage(request.webhookUrl, request.message).then(sendResponse);
+    return true;
+  }
+
+  // Notion actions
+  if (request.action === 'notionFetchDatabases') {
+    handleNotionFetchDatabases(request.token).then(sendResponse);
+    return true;
+  }
+
+  if (request.action === 'notionCreatePage') {
+    handleNotionCreatePage(request.token, request.databaseId, request.title, request.content).then(sendResponse);
     return true;
   }
 });
@@ -204,4 +222,104 @@ async function handleSignOut() {
     await chrome.storage.local.remove(TOKEN_STORAGE_KEY);
   }
   return { success: true };
+}
+
+// ==================== SLACK API ====================
+
+async function handleSlackMessage(webhookUrl, message) {
+  try {
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ text: message })
+    });
+
+    if (response.ok) {
+      return { success: true };
+    } else {
+      const errorText = await response.text();
+      return { success: false, error: errorText || 'Failed to send message' };
+    }
+  } catch (error) {
+    return { success: false, error: error.message || 'Network error' };
+  }
+}
+
+// ==================== NOTION API ====================
+
+async function handleNotionFetchDatabases(token) {
+  try {
+    const response = await fetch('https://api.notion.com/v1/search', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+      },
+      body: JSON.stringify({
+        filter: { property: 'object', value: 'database' },
+        page_size: 100
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const databases = data.results.map(db => ({
+        id: db.id,
+        name: db.title?.[0]?.plain_text || 'Untitled'
+      }));
+      return { success: true, databases };
+    } else {
+      const errorData = await response.json();
+      return { 
+        success: false, 
+        error: errorData.message || 'Failed to fetch databases' 
+      };
+    }
+  } catch (error) {
+    return { success: false, error: error.message || 'Network error' };
+  }
+}
+
+async function handleNotionCreatePage(token, databaseId, title, content) {
+  try {
+    const response = await fetch('https://api.notion.com/v1/pages', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+      },
+      body: JSON.stringify({
+        parent: { database_id: databaseId },
+        properties: {
+          title: {
+            title: [{ text: { content: title } }]
+          }
+        },
+        children: content ? [{
+          object: 'block',
+          type: 'paragraph',
+          paragraph: {
+            rich_text: [{ text: { content: content } }]
+          }
+        }] : []
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return { success: true, pageUrl: data.url };
+    } else {
+      const errorData = await response.json();
+      return { 
+        success: false, 
+        error: errorData.message || 'Failed to create page' 
+      };
+    }
+  } catch (error) {
+    return { success: false, error: error.message || 'Network error' };
+  }
 }

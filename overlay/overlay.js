@@ -95,7 +95,7 @@ const KeyshotsOverlay = {
     }
   },
 
-  showView(viewName) {
+  showView(viewName, options = {}) {
     this.currentView = viewName;
     
     const header = document.getElementById('keyshots-header');
@@ -122,6 +122,22 @@ const KeyshotsOverlay = {
       case 'settings':
         if (typeof KeyshotsSettings !== 'undefined') {
           KeyshotsSettings.render();
+        }
+        break;
+      // Smart AI-powered views
+      case 'smart-email':
+        if (typeof KeyshotsSmartEmailForm !== 'undefined') {
+          KeyshotsSmartEmailForm.render(options);
+        }
+        break;
+      case 'smart-slack':
+        if (typeof KeyshotsSmartSlackForm !== 'undefined') {
+          KeyshotsSmartSlackForm.render(options);
+        }
+        break;
+      case 'smart-tasks':
+        if (typeof KeyshotsExtractTasksForm !== 'undefined') {
+          KeyshotsExtractTasksForm.render(options);
         }
         break;
     }

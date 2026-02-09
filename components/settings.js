@@ -10,6 +10,10 @@ const KeyshotsSettings = {
     return '<svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="white"/><path d="M9 7L12 6.5L23 5.5L24 6V23L22 25L10 25.5L8 24V9L9 7Z" fill="white" stroke="black" stroke-width="1.5"/><path d="M10 9V23L21 22.5V8L10 9Z" stroke="black" stroke-width="1.5"/><line x1="12" y1="12" x2="18" y2="12" stroke="black" stroke-width="1.2" stroke-linecap="round"/><line x1="12" y1="15" x2="18" y2="15" stroke="black" stroke-width="1.2" stroke-linecap="round"/><line x1="12" y1="18" x2="15" y2="18" stroke="black" stroke-width="1.2" stroke-linecap="round"/></svg>';
   },
 
+  getGeminiIcon() {
+    return '<svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="#1A73E8"/><path d="M16 6L18.5 13.5L26 16L18.5 18.5L16 26L13.5 18.5L6 16L13.5 13.5L16 6Z" fill="white"/><circle cx="16" cy="16" r="3" fill="#1A73E8"/></svg>';
+  },
+
   getSettingsIcon() {
     return '<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="#636366"/><circle cx="16" cy="16" r="4" stroke="white" stroke-width="2"/><path d="M16 6V9M16 23V26M6 16H9M23 16H26M9.17 9.17L11.29 11.29M20.71 20.71L22.83 22.83M9.17 22.83L11.29 20.71M20.71 11.29L22.83 9.17" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>';
   },
@@ -25,6 +29,7 @@ const KeyshotsSettings = {
     
     const slackWebhook = await KeyshotsStorage.get(KeyshotsStorage.KEYS.SLACK_WEBHOOK) || '';
     const notionToken = await KeyshotsStorage.get(KeyshotsStorage.KEYS.NOTION_TOKEN) || '';
+    const geminiApiKey = await KeyshotsStorage.get('gemini_api_key') || '';
     const notionDatabases = await KeyshotsStorage.get(KeyshotsStorage.KEYS.NOTION_DATABASES) || [];
     
     const dbCount = notionDatabases.length;
@@ -38,6 +43,24 @@ const KeyshotsSettings = {
           '<span>Settings</span>' +
         '</div>' +
         
+        // Gemini AI Section
+        '<div class="keyshots-settings-section">' +
+          '<div class="keyshots-settings-title">' +
+            '<span class="keyshots-command-icon">' + this.getGeminiIcon() + '</span>' +
+            '<span>Gemini AI</span>' +
+            '<span class="keyshots-settings-badge">Smart Actions</span>' +
+          '</div>' +
+          '<div class="keyshots-form-group" style="margin-bottom: 0;">' +
+            '<label class="keyshots-form-label">API Key</label>' +
+            '<div class="keyshots-settings-row">' +
+              '<input type="password" id="keyshots-settings-gemini" class="keyshots-form-input" style="flex: 1;" placeholder="AIza..." value="' + this.escapeHtml(geminiApiKey) + '" />' +
+              '<button type="button" class="keyshots-btn keyshots-btn-secondary" id="keyshots-settings-test-gemini" style="height: 48px; padding: 0 14px; font-size: 13px; margin-left: 8px;">Test</button>' +
+            '</div>' +
+            '<div class="keyshots-settings-hint">Get your API key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a></div>' +
+          '</div>' +
+        '</div>' +
+        
+        // Slack Section
         '<div class="keyshots-settings-section">' +
           '<div class="keyshots-settings-title">' +
             '<span class="keyshots-command-icon">' + this.getSlackIcon() + '</span>' +
@@ -50,6 +73,7 @@ const KeyshotsSettings = {
           '</div>' +
         '</div>' +
         
+        // Notion Section
         '<div class="keyshots-settings-section">' +
           '<div class="keyshots-settings-title">' +
             '<span class="keyshots-command-icon">' + this.getNotionIcon() + '</span>' +
@@ -83,11 +107,13 @@ const KeyshotsSettings = {
     document.getElementById('keyshots-settings-cancel')?.addEventListener('click', () => KeyshotsOverlay.showCommandPalette());
     document.getElementById('keyshots-settings-save')?.addEventListener('click', () => this.handleSave());
     document.getElementById('keyshots-settings-fetch-dbs')?.addEventListener('click', () => this.handleFetchDatabases());
+    document.getElementById('keyshots-settings-test-gemini')?.addEventListener('click', () => this.handleTestGemini());
   },
 
   async handleSave() {
     const slackWebhook = document.getElementById('keyshots-settings-slack')?.value.trim();
     const notionToken = document.getElementById('keyshots-settings-notion')?.value.trim();
+    const geminiApiKey = document.getElementById('keyshots-settings-gemini')?.value.trim();
     const saveBtn = document.getElementById('keyshots-settings-save');
     
     if (saveBtn) {
@@ -98,6 +124,7 @@ const KeyshotsSettings = {
     try {
       await KeyshotsStorage.set(KeyshotsStorage.KEYS.SLACK_WEBHOOK, slackWebhook);
       await KeyshotsStorage.set(KeyshotsStorage.KEYS.NOTION_TOKEN, notionToken);
+      await KeyshotsStorage.set('gemini_api_key', geminiApiKey);
       
       KeyshotsOverlay.showMessage('success', 'Settings saved!');
     } catch (error) {
@@ -106,6 +133,34 @@ const KeyshotsSettings = {
         saveBtn.textContent = 'Save Settings';
       }
       this.showError('Failed to save settings');
+    }
+  },
+
+  async handleTestGemini() {
+    const apiKey = document.getElementById('keyshots-settings-gemini')?.value.trim();
+    const testBtn = document.getElementById('keyshots-settings-test-gemini');
+    
+    if (!apiKey) {
+      this.showError('Please enter a Gemini API key');
+      return;
+    }
+    
+    if (testBtn) {
+      testBtn.disabled = true;
+      testBtn.textContent = 'Testing...';
+    }
+    
+    const result = await KeyshotsGemini.testConnection(apiKey);
+    
+    if (testBtn) {
+      testBtn.disabled = false;
+      testBtn.textContent = 'Test';
+    }
+    
+    if (result.success) {
+      this.showSuccess('Gemini API connected!');
+    } else {
+      this.showError(result.error || 'Connection failed');
     }
   },
 

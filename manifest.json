@@ -11,7 +11,8 @@
   "host_permissions": [
     "https://hooks.slack.com/*",
     "https://api.notion.com/*",
-    "https://www.googleapis.com/*"
+    "https://www.googleapis.com/*",
+    "https://generativelanguage.googleapis.com/*"
   ],
   "oauth2": {
     "client_id": "495152588629-98g5suvfjc1bkmcktljqnptiosoh7jg0.apps.googleusercontent.com",
@@ -29,11 +30,17 @@
         "utils/storage.js",
         "utils/api-client.js",
         "utils/gmail-api.js",
+        "utils/gemini-client.js",
+        "utils/context-detector.js",
+        "components/ui-helpers.js",
         "components/command-palette.js",
         "components/gmail-form.js",
         "components/slack-form.js",
         "components/notion-form.js",
         "components/settings.js",
+        "components/smart-email-form.js",
+        "components/smart-slack-form.js",
+        "components/extract-tasks-form.js",
         "overlay/overlay.js",
         "content/content-script.js"
       ],

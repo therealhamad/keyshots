@@ -1,8 +1,12 @@
 // Keyshots Command Palette
-// Renders and manages the searchable command list
+// Renders and manages the searchable command list with smart context-aware actions
 
 const KeyshotsCommandPalette = {
-  // SVG icons for apps - using simple inline data URLs for reliability
+  // Store current context and all commands for filtering
+  currentContext: null,
+  allCommands: [],
+
+  // SVG icons for apps
   getIcon(type) {
     const icons = {
       gmail: '<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="#EA4335"/><path d="M8 11L16 17L24 11" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="6" y="9" width="20" height="14" rx="2" stroke="white" stroke-width="2"/></svg>',
@@ -11,12 +15,17 @@ const KeyshotsCommandPalette = {
       
       notion: '<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="white"/><path d="M9 7L12 6.5L23 5.5L24 6V23L22 25L10 25.5L8 24V9L9 7Z" fill="white" stroke="black" stroke-width="1.5"/><path d="M10 9V23L21 22.5V8L10 9Z" stroke="black" stroke-width="1.5"/><line x1="12" y1="12" x2="18" y2="12" stroke="black" stroke-width="1.2" stroke-linecap="round"/><line x1="12" y1="15" x2="18" y2="15" stroke="black" stroke-width="1.2" stroke-linecap="round"/><line x1="12" y1="18" x2="15" y2="18" stroke="black" stroke-width="1.2" stroke-linecap="round"/></svg>',
       
-      settings: '<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="#636366"/><circle cx="16" cy="16" r="4" stroke="white" stroke-width="2"/><path d="M16 6V9M16 23V26M6 16H9M23 16H26M9.17 9.17L11.29 11.29M20.71 20.71L22.83 22.83M9.17 22.83L11.29 20.71M20.71 11.29L22.83 9.17" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>'
+      settings: '<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="#636366"/><circle cx="16" cy="16" r="4" stroke="white" stroke-width="2"/><path d="M16 6V9M16 23V26M6 16H9M23 16H26M9.17 9.17L11.29 11.29M20.71 20.71L22.83 22.83M9.17 22.83L11.29 20.71M20.71 11.29L22.83 9.17" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>',
+
+      smart: '<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="#5856D6"/><path d="M16 6L18.5 13.5L26 16L18.5 18.5L16 26L13.5 18.5L6 16L13.5 13.5L16 6Z" fill="white"/></svg>',
+
+      tasks: '<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="#34C759"/><path d="M10 16L14 20L22 12" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
     };
     return icons[type] || icons.settings;
   },
 
-  commands: [
+  // Base commands (always available)
+  baseCommands: [
     {
       id: 'send-gmail',
       name: 'Send Email',
@@ -59,9 +68,104 @@ const KeyshotsCommandPalette = {
     }
   ],
 
+  // Get smart commands based on current context
+  getSmartCommands(context) {
+    const smartCommands = [];
+    
+    if (context.hasSelection) {
+      // Text is selected - offer quote/share actions
+      smartCommands.push({
+        id: 'smart-email-quote',
+        name: 'Email This Quote',
+        description: 'Share selected text via email',
+        iconType: 'smart',
+        type: 'Smart',
+        badge: '✨',
+        keywords: ['email', 'quote', 'share', 'selected', 'smart'],
+        category: 'Smart Actions',
+        action: () => KeyshotsOverlay.showView('smart-email', { context, type: 'quote' })
+      });
+
+      smartCommands.push({
+        id: 'smart-slack-quote',
+        name: 'Share to Slack',
+        description: 'Post selected text to Slack',
+        iconType: 'smart',
+        type: 'Smart',
+        badge: '✨',
+        keywords: ['slack', 'share', 'quote', 'smart'],
+        category: 'Smart Actions',
+        action: () => KeyshotsOverlay.showView('smart-slack', { context })
+      });
+
+      // Check if selected text looks like tasks
+      if (context.hasSelection && KeyshotsContext.hasTaskLikeContent()) {
+        smartCommands.push({
+          id: 'smart-extract-tasks',
+          name: 'Extract Tasks',
+          description: 'Find action items in selection',
+          iconType: 'tasks',
+          type: 'Smart',
+          badge: '✨',
+          keywords: ['tasks', 'extract', 'todo', 'action', 'smart'],
+          category: 'Smart Actions',
+          action: () => KeyshotsOverlay.showView('smart-tasks', { context })
+        });
+      }
+    } else if (context.isArticle) {
+      // On an article page - offer summarization actions
+      smartCommands.push({
+        id: 'smart-email-page',
+        name: 'Email This Page',
+        description: 'Share this article via email',
+        iconType: 'smart',
+        type: 'Smart',
+        badge: '✨',
+        keywords: ['email', 'article', 'page', 'share', 'smart'],
+        category: 'Smart Actions',
+        action: () => KeyshotsOverlay.showView('smart-email', { context, type: 'page' })
+      });
+
+      smartCommands.push({
+        id: 'smart-slack-summarize',
+        name: 'Summarize for Slack',
+        description: 'Share article summary to Slack',
+        iconType: 'smart',
+        type: 'Smart',
+        badge: '✨',
+        keywords: ['slack', 'summarize', 'article', 'smart'],
+        category: 'Smart Actions',
+        action: () => KeyshotsOverlay.showView('smart-slack', { context })
+      });
+    }
+
+    return smartCommands;
+  },
+
+  // Build all commands including smart ones
+  buildCommands() {
+    // Detect current context
+    this.currentContext = typeof KeyshotsContext !== 'undefined' ? KeyshotsContext.detect() : null;
+    
+    // Get smart commands based on context
+    const smartCommands = this.currentContext ? this.getSmartCommands(this.currentContext) : [];
+    
+    // Combine smart + base commands
+    this.allCommands = [...smartCommands, ...this.baseCommands];
+    
+    // Legacy compatibility
+    this.commands = this.allCommands;
+    
+    return this.allCommands;
+  },
+
   render(filterText = '') {
     const content = document.getElementById('keyshots-content');
     const footer = document.getElementById('keyshots-footer');
+    
+    // Build commands fresh each render to get current context
+    this.buildCommands();
+    
     const filteredCommands = this.filterCommands(filterText);
     
     if (footer) footer.style.display = 'flex';
@@ -71,9 +175,25 @@ const KeyshotsCommandPalette = {
       return;
     }
 
-    const grouped = this.groupByCategory(filteredCommands);
-    
+    // Show context indicator if there's a selection
     let html = '';
+    
+    if (this.currentContext?.hasSelection && !filterText) {
+      const preview = this.currentContext.selectedText.substring(0, 60) + 
+        (this.currentContext.selectedText.length > 60 ? '...' : '');
+      html += '<div class="keyshots-context-indicator">' +
+        '<span class="keyshots-context-icon">📝</span>' +
+        '<span class="keyshots-context-text">Text selected (' + this.currentContext.selectedText.length + ' chars)</span>' +
+        '<div class="keyshots-context-preview">"' + this.escapeHtml(preview) + '"</div>' +
+      '</div>';
+    } else if (this.currentContext?.isArticle && !filterText) {
+      html += '<div class="keyshots-context-indicator">' +
+        '<span class="keyshots-context-icon">📄</span>' +
+        '<span class="keyshots-context-text">Article detected (' + this.currentContext.wordCount + ' words)</span>' +
+      '</div>';
+    }
+
+    const grouped = this.groupByCategory(filteredCommands);
     let globalIndex = 0;
     
     for (const [category, commands] of Object.entries(grouped)) {
@@ -85,7 +205,11 @@ const KeyshotsCommandPalette = {
         html += '<li class="keyshots-command-item' + activeClass + '" data-command-id="' + cmd.id + '" data-index="' + globalIndex + '">';
         html += '<span class="keyshots-command-icon">' + this.getIcon(cmd.iconType) + '</span>';
         html += '<div class="keyshots-command-info">';
-        html += '<div class="keyshots-command-name">' + cmd.name + '</div>';
+        html += '<div class="keyshots-command-name">' + cmd.name;
+        if (cmd.badge) {
+          html += '<span class="keyshots-command-badge">' + cmd.badge + '</span>';
+        }
+        html += '</div>';
         html += '<div class="keyshots-command-description">' + cmd.description + '</div>';
         html += '</div>';
         html += '<span class="keyshots-command-type">' + cmd.type + '</span>';
@@ -103,7 +227,7 @@ const KeyshotsCommandPalette = {
     items.forEach((item) => {
       item.addEventListener('click', () => {
         const commandId = item.dataset.commandId;
-        const command = this.commands.find(c => c.id === commandId);
+        const command = this.allCommands.find(c => c.id === commandId);
         if (command) {
           command.action();
         }
@@ -133,12 +257,12 @@ const KeyshotsCommandPalette = {
 
   filterCommands(filterText) {
     if (!filterText.trim()) {
-      return this.commands;
+      return this.allCommands;
     }
 
     const searchTerm = filterText.toLowerCase().trim();
     
-    return this.commands.filter(cmd => {
+    return this.allCommands.filter(cmd => {
       const nameMatch = cmd.name.toLowerCase().includes(searchTerm);
       const descMatch = cmd.description.toLowerCase().includes(searchTerm);
       const keywordMatch = cmd.keywords.some(kw => kw.includes(searchTerm));
