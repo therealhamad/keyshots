@@ -1,5 +1,5 @@
 // Keyshots Activity Fetcher
-// Fetches activity data from GitHub and Notion for standup generation
+// Fetches activity data from GitHub, Notion, and Google Calendar for standup generation
 
 const KeyshotsActivityFetcher = {
   /**
@@ -39,16 +39,36 @@ const KeyshotsActivityFetcher = {
   },
 
   /**
+   * Fetch Google Calendar meetings from last 24 hours
+   */
+  async fetchCalendarActivity() {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        { action: 'calendarFetchActivity' },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            resolve({ success: false, error: chrome.runtime.lastError.message, meetings: [] });
+          } else {
+            resolve(response || { success: false, error: 'No response', meetings: [] });
+          }
+        }
+      );
+    });
+  },
+
+  /**
    * Fetch all activity from all configured sources
    */
   async fetchAllActivity() {
     const githubToken = await KeyshotsStorage.get('github_token');
     const githubUsername = await KeyshotsStorage.get('github_username');
     const notionToken = await KeyshotsStorage.get(KeyshotsStorage.KEYS.NOTION_TOKEN);
+    const calendarConnected = await KeyshotsStorage.get('calendar_connected');
 
     const results = {
       commits: [],
       tasks: [],
+      meetings: [],
       errors: []
     };
 
@@ -80,6 +100,19 @@ const KeyshotsActivityFetcher = {
       }
     }
 
+    // Fetch Google Calendar meetings
+    if (calendarConnected) {
+      try {
+        const calResult = await this.fetchCalendarActivity();
+        if (calResult.success) {
+          results.meetings = calResult.meetings || [];
+        } else {
+          results.errors.push({ source: 'Google Calendar', error: calResult.error });
+        }
+      } catch (error) {
+        results.errors.push({ source: 'Google Calendar', error: error.message });
+      }
+    }
     return results;
   }
 };

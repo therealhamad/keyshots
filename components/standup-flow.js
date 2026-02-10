@@ -1,14 +1,16 @@
 // Keyshots Standup Flow
-// Automated standup generator with GitHub and Notion integration
+// Automated standup generator with GitHub, Notion, and Calendar integration
 
 const KeyshotsStandupFlow = {
   // State for standup data
   standupData: {
     commits: [],
     tasks: [],
+    meetings: [],
     blockers: '',
     selectedCommits: [],
-    selectedTasks: []
+    selectedTasks: [],
+    selectedMeetings: []
   },
 
   getBackIcon() {
@@ -45,6 +47,10 @@ const KeyshotsStandupFlow = {
             <span class="keyshots-loading-step-icon">○</span>
             <span>Checking Notion tasks</span>
           </div>
+          <div class="keyshots-loading-step" id="keyshots-step-calendar">
+            <span class="keyshots-loading-step-icon">○</span>
+            <span>Loading calendar events</span>
+          </div>
         </div>
         <div class="keyshots-spinner"></div>
         <p style="color: rgba(255, 255, 255, 0.4); font-size: 13px; margin-top: 16px;">
@@ -72,24 +78,41 @@ const KeyshotsStandupFlow = {
         stepNotion.querySelector('.keyshots-loading-step-icon').textContent = '⚡';
       }
       
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 400));
       
       if (stepNotion) {
         stepNotion.classList.remove('keyshots-step-active');
         stepNotion.classList.add('keyshots-step-complete');
         stepNotion.querySelector('.keyshots-loading-step-icon').textContent = '✓';
       }
+
+      // Animate step - Calendar
+      const stepCalendar = document.getElementById('keyshots-step-calendar');
+      if (stepCalendar) {
+        stepCalendar.classList.add('keyshots-step-active');
+        stepCalendar.querySelector('.keyshots-loading-step-icon').textContent = '⚡';
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 400));
+      
+      if (stepCalendar) {
+        stepCalendar.classList.remove('keyshots-step-active');
+        stepCalendar.classList.add('keyshots-step-complete');
+        stepCalendar.querySelector('.keyshots-loading-step-icon').textContent = '✓';
+      }
       
       // Store data
       this.standupData.commits = activity.commits || [];
       this.standupData.tasks = activity.tasks || [];
+      this.standupData.meetings = activity.meetings || [];
       
       // Pre-select all items
       this.standupData.selectedCommits = this.standupData.commits.map((_, i) => i);
       this.standupData.selectedTasks = this.standupData.tasks.map((_, i) => i);
+      this.standupData.selectedMeetings = this.standupData.meetings.map((_, i) => i);
       
       // Check if we have any data
-      const hasData = this.standupData.commits.length > 0 || this.standupData.tasks.length > 0;
+      const hasData = this.standupData.commits.length > 0 || this.standupData.tasks.length > 0 || this.standupData.meetings.length > 0;
       
       if (!hasData) {
         this.showNoActivityFound(activity.errors);
@@ -137,7 +160,7 @@ const KeyshotsStandupFlow = {
 
   showActivityReview() {
     const content = document.getElementById('keyshots-content');
-    const { commits, tasks } = this.standupData;
+    const { commits, tasks, meetings } = this.standupData;
     
     let html = `
       <div class="keyshots-form">
@@ -208,6 +231,33 @@ const KeyshotsStandupFlow = {
       `;
     }
 
+    // Google Calendar meetings section
+    if (meetings.length > 0) {
+      html += `
+        <div class="keyshots-activity-section">
+          <div class="keyshots-activity-section-header">
+            <input type="checkbox" id="keyshots-toggle-meetings" checked />
+            <label for="keyshots-toggle-meetings">
+              <strong>Calendar</strong> (${meetings.length} meeting${meetings.length !== 1 ? 's' : ''})
+            </label>
+          </div>
+          <div class="keyshots-activity-items">
+            ${meetings.map((meeting, index) => `
+              <div class="keyshots-activity-item">
+                <input type="checkbox" id="keyshots-meeting-${index}" data-type="meetings" data-index="${index}" checked />
+                <label for="keyshots-meeting-${index}">
+                  <div class="keyshots-activity-item-title">${this.escapeHtml(meeting.summary)}</div>
+                  <div class="keyshots-activity-item-meta">
+                    ${this.formatMeetingTime(meeting.start)} • ${meeting.duration}min • ${meeting.attendees} attendees
+                  </div>
+                </label>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
     html += `
         </div>
 
@@ -247,6 +297,9 @@ const KeyshotsStandupFlow = {
     document.getElementById('keyshots-toggle-tasks')?.addEventListener('change', (e) => {
       this.toggleAllItems('tasks', e.target.checked);
     });
+    document.getElementById('keyshots-toggle-meetings')?.addEventListener('change', (e) => {
+      this.toggleAllItems('meetings', e.target.checked);
+    });
     
     // Individual checkboxes
     document.querySelectorAll('.keyshots-activity-item input[type="checkbox"]').forEach(checkbox => {
@@ -270,8 +323,11 @@ const KeyshotsStandupFlow = {
   },
 
   toggleAllItems(type, checked) {
-    const key = type === 'commits' ? 'selectedCommits' : 'selectedTasks';
-    const items = type === 'commits' ? this.standupData.commits : this.standupData.tasks;
+    const keyMap = { commits: 'selectedCommits', tasks: 'selectedTasks', meetings: 'selectedMeetings' };
+    const dataMap = { commits: this.standupData.commits, tasks: this.standupData.tasks, meetings: this.standupData.meetings };
+    
+    const key = keyMap[type];
+    const items = dataMap[type];
     
     this.standupData[key] = checked ? items.map((_, i) => i) : [];
     
@@ -281,7 +337,8 @@ const KeyshotsStandupFlow = {
   },
 
   updateSelection(type, index, checked) {
-    const key = type === 'commits' ? 'selectedCommits' : 'selectedTasks';
+    const keyMap = { commits: 'selectedCommits', tasks: 'selectedTasks', meetings: 'selectedMeetings' };
+    const key = keyMap[type];
     
     if (checked) {
       if (!this.standupData[key].includes(index)) {
@@ -320,11 +377,13 @@ const KeyshotsStandupFlow = {
       // Prepare selected data
       const selectedCommits = this.standupData.selectedCommits.map(i => this.standupData.commits[i]);
       const selectedTasks = this.standupData.selectedTasks.map(i => this.standupData.tasks[i]);
+      const selectedMeetings = this.standupData.selectedMeetings.map(i => this.standupData.meetings[i]);
 
       // Generate standup with Gemini
       const standupMessage = await this.generateWithGemini(
         selectedCommits,
         selectedTasks,
+        selectedMeetings,
         this.standupData.blockers
       );
 
@@ -339,7 +398,7 @@ const KeyshotsStandupFlow = {
     }
   },
 
-  async generateWithGemini(commits, tasks, blockers) {
+  async generateWithGemini(commits, tasks, meetings, blockers) {
     const prompt = `
 You are generating a daily standup update for Slack. Use a professional but friendly tone.
 
@@ -349,12 +408,15 @@ ${commits.length > 0 ? `GitHub Commits:\n${commits.map(c => `- ${c.message} (${c
 
 ${tasks.length > 0 ? `Notion Tasks:\n${tasks.map(t => `- ${t.title}${t.status ? ' (' + t.status + ')' : ''}`).join('\n')}\n` : ''}
 
+${meetings.length > 0 ? `Meetings Attended:\n${meetings.map(m => `- ${m.summary} (${m.duration}min, ${m.attendees} attendees)`).join('\n')}\n` : ''}
+
 ${blockers ? `Blockers/Challenges:\n${blockers}\n` : ''}
 
 Generate a standup update with these sections:
 1. *Yesterday* 🗓️ - What was accomplished (combine commits + tasks, be specific but concise)
 2. *Today* 📋 - What will be worked on (infer from yesterday's work + any unfinished items)
-${blockers ? '3. *Blockers* 🚧 - Challenges mentioned' : ''}
+${meetings.length > 0 ? '3. *Meetings* 🤝 - Key meetings attended (keep concise, just meeting names)' : ''}
+${blockers ? `${meetings.length > 0 ? '4' : '3'}. *Blockers* 🚧 - Challenges mentioned` : ''}
 
 Requirements:
 - Use Slack markdown formatting (*bold* for headers)
@@ -363,7 +425,7 @@ Requirements:
 - Keep each bullet concise (one line)
 - Professional but conversational tone
 - If commits are similar, group them intelligently
-- Total length: under 200 words
+- Total length: under 250 words
 - Do NOT add any preamble or explanation, ONLY return the standup message
 
 Return ONLY the formatted standup message.
@@ -469,5 +531,14 @@ Return ONLY the formatted standup message.
     } else {
       return date.toLocaleDateString();
     }
+  },
+
+  formatMeetingTime(isoString) {
+    const date = new Date(isoString);
+    return date.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    });
   }
 };
