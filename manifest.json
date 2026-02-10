@@ -12,7 +12,8 @@
     "https://hooks.slack.com/*",
     "https://api.notion.com/*",
     "https://www.googleapis.com/*",
-    "https://generativelanguage.googleapis.com/*"
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.github.com/*"
   ],
   "oauth2": {
     "client_id": "495152588629-98g5suvfjc1bkmcktljqnptiosoh7jg0.apps.googleusercontent.com",
@@ -32,6 +33,7 @@
         "utils/gmail-api.js",
         "utils/gemini-client.js",
         "utils/context-detector.js",
+        "utils/activity-fetcher.js",
         "components/ui-helpers.js",
         "components/command-palette.js",
         "components/gmail-form.js",
@@ -41,6 +43,7 @@
         "components/smart-email-form.js",
         "components/smart-slack-form.js",
         "components/extract-tasks-form.js",
+        "components/standup-flow.js",
         "overlay/overlay.js",
         "content/content-script.js"
       ],

@@ -140,6 +140,11 @@ const KeyshotsOverlay = {
           KeyshotsExtractTasksForm.render(options);
         }
         break;
+      case 'standup':
+        if (typeof KeyshotsStandupFlow !== 'undefined') {
+          KeyshotsStandupFlow.render();
+        }
+        break;
     }
   },
 

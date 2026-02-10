@@ -55,6 +55,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     handleNotionCreatePage(request.token, request.databaseId, request.title, request.content).then(sendResponse);
     return true;
   }
+
+  // GitHub activity for standup
+  if (request.action === 'githubFetchActivity') {
+    handleGitHubFetchActivity(request.token, request.username).then(sendResponse);
+    return true;
+  }
+
+  // Notion activity for standup
+  if (request.action === 'notionFetchActivity') {
+    handleNotionFetchActivity(request.token).then(sendResponse);
+    return true;
+  }
 });
 
 // Get stored token or initiate OAuth flow
@@ -321,5 +333,142 @@ async function handleNotionCreatePage(token, databaseId, title, content) {
     }
   } catch (error) {
     return { success: false, error: error.message || 'Network error' };
+  }
+}
+
+// ==================== GITHUB API (Standup) ====================
+
+async function handleGitHubFetchActivity(token, username) {
+  try {
+    const response = await fetch(
+      `https://api.github.com/users/${username}/events?per_page=100`,
+      {
+        headers: {
+          'Authorization': `token ${token}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return { 
+        success: false, 
+        error: errorData.message || `GitHub API error: ${response.status}`,
+        commits: []
+      };
+    }
+
+    const events = await response.json();
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    
+    // Filter for PushEvents from last 24h
+    const commits = events
+      .filter(e => {
+        if (e.type !== 'PushEvent') return false;
+        const eventDate = new Date(e.created_at);
+        return eventDate > cutoff;
+      })
+      .flatMap(e => e.payload.commits.map(c => ({
+        message: c.message.split('\n')[0], // First line only
+        repo: e.repo.name,
+        time: e.created_at,
+        url: `https://github.com/${e.repo.name}/commit/${c.sha}`
+      })));
+
+    // Deduplicate by message
+    const uniqueCommits = [];
+    const seen = new Set();
+    
+    for (const commit of commits) {
+      if (!seen.has(commit.message)) {
+        seen.add(commit.message);
+        uniqueCommits.push(commit);
+      }
+    }
+
+    return { success: true, commits: uniqueCommits };
+  } catch (error) {
+    return { success: false, error: error.message || 'Network error', commits: [] };
+  }
+}
+
+// ==================== NOTION ACTIVITY (Standup) ====================
+
+async function handleNotionFetchActivity(token) {
+  try {
+    const response = await fetch('https://api.notion.com/v1/search', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+      },
+      body: JSON.stringify({
+        filter: {
+          property: 'object',
+          value: 'page'
+        },
+        sort: {
+          direction: 'descending',
+          timestamp: 'last_edited_time'
+        },
+        page_size: 100
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return { 
+        success: false, 
+        error: errorData.message || `Notion API error: ${response.status}`,
+        tasks: []
+      };
+    }
+
+    const data = await response.json();
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    
+    // Filter for recently edited pages
+    const tasks = data.results
+      .filter(page => {
+        const lastEdited = new Date(page.last_edited_time);
+        return lastEdited > cutoff;
+      })
+      .map(page => {
+        // Try to get title from different property types
+        let title = 'Untitled';
+        
+        if (page.properties.Name?.title?.[0]?.plain_text) {
+          title = page.properties.Name.title[0].plain_text;
+        } else if (page.properties.Title?.title?.[0]?.plain_text) {
+          title = page.properties.Title.title[0].plain_text;
+        } else if (page.properties.title?.title?.[0]?.plain_text) {
+          title = page.properties.title.title[0].plain_text;
+        }
+        
+        // Try to determine if it's marked as done/completed
+        const status = page.properties.Status?.status?.name || 
+                      page.properties.Status?.select?.name ||
+                      null;
+        
+        const isCompleted = status && 
+          (status.toLowerCase().includes('done') || 
+           status.toLowerCase().includes('complete'));
+        
+        return {
+          title: title,
+          status: status,
+          isCompleted: isCompleted,
+          lastEdited: page.last_edited_time,
+          url: page.url
+        };
+      })
+      // Only include completed tasks or recently edited ones with titles
+      .filter(task => task.isCompleted || task.title !== 'Untitled');
+
+    return { success: true, tasks };
+  } catch (error) {
+    return { success: false, error: error.message || 'Network error', tasks: [] };
   }
 }

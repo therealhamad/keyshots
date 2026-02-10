@@ -19,13 +19,26 @@ const KeyshotsCommandPalette = {
 
       smart: '<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="#5856D6"/><path d="M16 6L18.5 13.5L26 16L18.5 18.5L16 26L13.5 18.5L6 16L13.5 13.5L16 6Z" fill="white"/></svg>',
 
-      tasks: '<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="#34C759"/><path d="M10 16L14 20L22 12" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      tasks: '<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="#34C759"/><path d="M10 16L14 20L22 12" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+
+      standup: '<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="#5856D6"/><path d="M10 12H22M10 16H22M10 20H18" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>'
     };
     return icons[type] || icons.settings;
   },
 
   // Base commands (always available)
   baseCommands: [
+    {
+      id: 'generate-standup',
+      name: 'Generate Standup Update',
+      description: 'Auto-create from your recent activity',
+      iconType: 'standup',
+      type: 'Smart',
+      badge: '✨',
+      keywords: ['standup', 'update', 'daily', 'status', 'report', 'morning', 'sync'],
+      category: 'Smart Actions',
+      action: () => KeyshotsOverlay.showView('standup')
+    },
     {
       id: 'send-gmail',
       name: 'Send Email',
